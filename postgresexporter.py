@@ -17,7 +17,10 @@
 #import psycopg2
 import uuid
 import sys
+import logging
 
+log = logging.getLogger(__name__)
+logging.basicConfig(level = logging.INFO)
 
 def untuple(what):
 	if type(what) is tuple:
@@ -48,7 +51,7 @@ class PostgresExporter(object):
 			self.cur = self.conn.cursor()
 			self.conn.set_isolation_level(0)
 		except psycopg2.Error, e:
-			print "%s" % (e.args)
+			log.error(e.args)
 			sys.exit()
 
 	def good_quality(self, what):
@@ -62,9 +65,9 @@ class PostgresExporter(object):
 			self.cur.execute(query, values)
 		except psycopg2.Error as e:
 			try:
-				print "Error executing: %s" % self.cur.mogrify(query, values)
+				log.error("Error executing: %s" % self.cur.mogrify(query, values))
 			except TypeError:
-				print "Error executing: %s" % query
+				log.error("Error executing: %s", query)
 			raise PostgresExporter.ExecuteError(e.args)
 
 	def finish(self, completely_done=False):
@@ -106,7 +109,7 @@ class PostgresExporter(object):
 		try:
 			self.execute(query, values)
 		except PostgresExporter.ExecuteError as e:
-			print "%s" % (e.args)
+			log.warn(e.args)
 			return
 		imgCols = "uri,height,width,type,uri150"
 		for img in label.images:
@@ -157,13 +160,13 @@ class PostgresExporter(object):
 		for counter in xrange(1, len(columns.split(","))):
 			escapeStrings = escapeStrings + ",%s"
 		escapeStrings = '(%s' + escapeStrings + ')'
-		#print values
+		log.debug(values)
 		query = "INSERT INTO artist(" + columns + ") VALUES" + escapeStrings + ";"
-		#print query
+		log.debug(query)
 		try:
 			self.execute(query, values)
 		except PostgresExporter.ExecuteError, e:
-			print "%s" % (e.args)
+			log.warn(e.args)
 			return
 
 		imgCols = "uri,height,width,type,uri150"
@@ -180,6 +183,8 @@ class PostgresExporter(object):
 					self.execute(imgQuery, imgValues)
 					self.imgUris[img.uri] = True
 				self.execute("INSERT INTO artists_images(image_uri, artist_id) VALUES(%s,%s);", (img.uri, artist.id))
+		log.debug('Saved artist %s:%s', artist.id, artist.name)
+
 
 	def storeRelease(self, release):
 		if not self.good_quality(release):
@@ -217,7 +222,7 @@ class PostgresExporter(object):
 		try:
 			self.execute(query, values)
 		except PostgresExporter.ExecuteError, e:
-			print "%s" % (e.args)
+			log.warn(e.args)
 			return
 		imgCols = "uri,height,width,type,uri150"
 		for img in release.images:
@@ -228,24 +233,25 @@ class PostgresExporter(object):
 			imgValues.append(img.imageType)
 			imgValues.append(img.uri150)
 			if len(imgValues) != 0:
-				if not img.uri in self.imgUris:
-					self.execute("SELECT uri FROM image WHERE uri=%s;", (img.uri, ))
-					if self.cur is None or len(self.cur.fetchall()) == 0:
-						imgQuery = "INSERT INTO image(" + imgCols + ") VALUES(%s,%s,%s,%s,%s);"
-						self.execute(imgQuery, imgValues)
-					self.imgUris[img.uri] = True
+				self.execute("SELECT uri FROM image WHERE uri=%s;", (img.uri, ))
+				if self.cur is None or len(self.cur.fetchall()) == 0:
+					imgQuery = "INSERT INTO image(" + imgCols + ") VALUES(%s,%s,%s,%s,%s);"
+					self.execute(imgQuery, imgValues)
 				self.execute("INSERT INTO releases_images(image_uri, release_id) VALUES(%s,%s);",
 						(img.uri, release.id))
 		for fmt in release.formats:
-			if len(release.formats) != 0:
-				if not fmt.name in self.formatNames:
-					self.formatNames[fmt.name] = True
-					try:
-						self.execute("INSERT INTO format(name) VALUES(%s);", (fmt.name, ))
-					except PostgresExporter.ExecuteError, e:
-						print "%s" % (e.args)
-				query = "INSERT INTO releases_formats(release_id, format_name, qty, descriptions) VALUES(%s,%s,%s,%s);"
-				self.execute(query, (release.id, fmt.name, fmt.qty, fmt.descriptions))
+			if not fmt.name in self.formatNames:
+				self.formatNames[fmt.name] = True
+				try:
+					self.execute("INSERT INTO format(name) VALUES(%s);", (fmt.name, ))
+				except PostgresExporter.ExecuteError, e:
+					log.warn(e.args)
+                        try:
+                                fmt.qty = int(fmt.qty)
+                        except ValueError:
+                                fmt.qty = 0
+			query = "INSERT INTO releases_formats(release_id, format_name, qty, descriptions) VALUES(%s,%s,%d,%s);"
+			self.execute(query, (release.id, fmt.name, fmt.qty, fmt.descriptions))
 		labelQuery = "INSERT INTO releases_labels(release_id, label, catno) VALUES(%s,%s,%s);"
 		for lbl in release.labels:
 			self.execute(labelQuery, (release.id, lbl.name, lbl.catno))
@@ -305,15 +311,16 @@ class PostgresExporter(object):
 					self.execute("INSERT INTO tracks_extraartists(track_id, artist_name) VALUES(%s,%s);", (trackid, extr.name))
 					for role in extr.roles:
 						if type(role).__name__ == 'tuple':
-							#print trackid
-							#print extr.name
-							#print role[0]
-							#print role[1]
+							log.debug(trackid)
+							log.debug(extr.name)
+							log.debug(role[0])
+							log.debug(role[1])
 							self.execute("INSERT INTO tracks_extraartists_roles(track_id, artist_name, role_name, role_details) VALUES(%s,%s,%s,%s);",
 									(trackid, extr.name, role[0], role[1]))
 						else:
 							self.execute("INSERT INTO tracks_extraartists_roles(track_id, artist_name, role_name) VALUES(%s,%s,%s);",
 									(trackid, extr.name, role))
+		log.debug('Saved release %s:%s', release.id, release.title)
 
 	def storeMaster(self, master):
 		if not self.good_quality(master):
@@ -349,7 +356,7 @@ class PostgresExporter(object):
 		try:
 			self.execute(query, values)
 		except PostgresExporter.ExecuteError, e:
-			print "%s" % (e.args)
+			log.warn(e.args)
 			return
 		imgCols = "uri,height,width,type,uri150"
 		for img in master.images:
@@ -398,7 +405,7 @@ class PostgresExporter(object):
 			self.execute("INSERT INTO masters_extraartists(master_id, artist_name, roles) VALUES(%s,%s,%s);",
 					(master.id, extr.name, map(lambda x: x[0] if type(x) is tuple else x, extr.roles)))
 					#(master.id, extr.name, flatten(extr.roles)))
-
+		log.debug('Saved master %s:%s', master.id, master.title)
 
 class PostgresConsoleDumper(PostgresExporter):
 
