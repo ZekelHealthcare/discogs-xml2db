@@ -123,8 +123,8 @@ CREATE TABLE release (
     country text,
     released text,
     notes text,
-    genres text,
-    styles text,
+    genres text[],
+    styles text[],
     master_id int,
 	data_quality text
 );
@@ -272,8 +272,8 @@ CREATE TABLE master (
     main_release integer NOT NULL,
     year int,
     notes text,
-    genres text,
-    styles text,
+    genres text[],
+    styles text[],
 	data_quality text
 );
 
