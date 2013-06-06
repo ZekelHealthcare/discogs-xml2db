@@ -39,7 +39,8 @@ class ReleaseHandler(xml.sax.handler.ContentHandler):
 							'formats',
 							'genre',
 							'genres',
-							#'indentifiers', 'identifier',
+							'id',
+							'identifiers', 'identifier',
 							'image',
 							'images',
 							'join',
@@ -61,6 +62,7 @@ class ReleaseHandler(xml.sax.handler.ContentHandler):
 							'tracks',
 							'url',
 							'urls',
+							'video','videos'
 							)
 		self.release = None
 		self.buffer = ''

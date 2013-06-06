@@ -250,7 +250,7 @@ class PostgresExporter(object):
                                 fmt.qty = int(fmt.qty)
                         except ValueError:
                                 fmt.qty = 0
-			query = "INSERT INTO releases_formats(release_id, format_name, qty, descriptions) VALUES(%s,%s,%d,%s);"
+			query = "INSERT INTO releases_formats(release_id, format_name, qty, descriptions) VALUES(%s,%s,%s,%s);"
 			self.execute(query, (release.id, fmt.name, fmt.qty, fmt.descriptions))
 		labelQuery = "INSERT INTO releases_labels(release_id, label, catno) VALUES(%s,%s,%s);"
 		for lbl in release.labels:

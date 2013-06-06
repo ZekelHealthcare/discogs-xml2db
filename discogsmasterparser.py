@@ -34,6 +34,7 @@ class MasterHandler(xml.sax.handler.ContentHandler):
 							'description',
 							#'descriptions', #'duration', #'extraartists', #'format', #'formats',
 							'genre', 'genres',
+							'id',
 							'image',
 							'images',
 							'join',
@@ -50,7 +51,7 @@ class MasterHandler(xml.sax.handler.ContentHandler):
 							#'track', #'tracklist',
 							'tracks',
 							#'url', #'urls',
-							#'videos', 'video',
+							'videos', 'video',
 							'year'
 							)
 		self.master = None
